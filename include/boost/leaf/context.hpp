@@ -260,19 +260,27 @@ namespace leaf_detail
     template <class L>
     struct deduce_e_tuple_impl;
 
+    template <class E, class V>
+    auto make_e_init_value(V &&value) { return value; }
+
     template <template <class...> class L, class... E>
     struct deduce_e_tuple_impl<L<E...>>
     {
         using type = std::tuple<slot<E>...>;
+
+        BOOST_LEAF_CONSTEXPR static type make(bool enable_deep_frame_deactivation) noexcept { return type(make_e_init_value<E>(enable_deep_frame_deactivation)... ); }
     };
 
     template <class... E>
     using deduce_e_tuple = typename deduce_e_tuple_impl<typename deduce_e_type_list<leaf_detail_mp11::mp_list<E...>>::type>::type;
+
+    template <class... E>
+    auto make_e_tuple(bool enable_deep_frame_deactivation) { return deduce_e_tuple_impl<typename deduce_e_type_list<leaf_detail_mp11::mp_list<E...>>::type>::make(enable_deep_frame_deactivation); }
 }
 
 ////////////////////////////////////////////
 
-template <class... E>
+template <bool enable_deep_frame_deactivation, class... E>
 class context
 {
     context( context const & ) = delete;
@@ -304,6 +312,7 @@ public:
     }
 
     BOOST_LEAF_CONSTEXPR context() noexcept:
+        tup_(leaf_detail::make_e_tuple<E...>(enable_deep_frame_deactivation)),
         is_active_(false)
     {
     }
@@ -380,17 +389,17 @@ public:
 
 namespace leaf_detail
 {
-    template <class TypeList>
+    template <bool enable_deep_frame_deactivation, class TypeList>
     struct deduce_context_impl;
 
-    template <template <class...> class L, class... E>
-    struct deduce_context_impl<L<E...>>
+    template <bool enable_deep_frame_deactivation, template <class...> class L, class... E>
+    struct deduce_context_impl<enable_deep_frame_deactivation, L<E...>>
     {
-        using type = context<E...>;
+        using type = context<enable_deep_frame_deactivation, E...>;
     };
 
-    template <class TypeList>
-    using deduce_context = typename deduce_context_impl<TypeList>::type;
+    template <bool enable_deep_frame_deactivation, class TypeList>
+    using deduce_context = typename deduce_context_impl<enable_deep_frame_deactivation, TypeList>::type;
 
     template <class H>
     struct fn_mp_args_fwd
@@ -410,10 +419,10 @@ namespace leaf_detail
         using type = leaf_detail_mp11::mp_append<typename fn_mp_args_fwd<H>::type...>;
     };
 
-    template <class... H>
+    template <bool enable_deep_frame_deactivation, class... H>
     struct context_type_from_handlers_impl
     {
-        using type = deduce_context<leaf_detail_mp11::mp_append<typename fn_mp_args_fwd<H>::type...>>;
+        using type = deduce_context<enable_deep_frame_deactivation, leaf_detail_mp11::mp_append<typename fn_mp_args_fwd<H>::type...>>;
     };
 
     template <class Ctx>
@@ -429,7 +438,10 @@ namespace leaf_detail
 }
 
 template <class... H>
-using context_type_from_handlers = typename leaf_detail::context_type_from_handlers_impl<H...>::type;
+using context_type_from_handlers = typename leaf_detail::context_type_from_handlers_impl<false, H...>::type;
+
+template <class... H>
+using context_type_for_stack_from_handlers = typename leaf_detail::context_type_from_handlers_impl<true, H...>::type;
 
 ////////////////////////////////////////////
 
@@ -457,6 +469,20 @@ template <class...  H>
 inline context_ptr make_shared_context( H && ... ) noexcept
 {
     return std::make_shared<leaf_detail::polymorphic_context_impl<context_type_from_handlers<H...>>>();
+}
+
+////////////////////////////////////////////
+
+template <class...  H>
+inline context_ptr make_shared_context_for_stack() noexcept
+{
+    return std::make_shared<leaf_detail::polymorphic_context_impl<context_type_for_stack_from_handlers<H...>>>();
+}
+
+template <class...  H>
+inline context_ptr make_shared_context_for_stack( H && ... ) noexcept
+{
+    return std::make_shared<leaf_detail::polymorphic_context_impl<context_type_for_stack_from_handlers<H...>>>();
 }
 
 } }

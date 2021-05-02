@@ -640,22 +640,22 @@ namespace leaf_detail
 
 ////////////////////////////////////////
 
-template <class... E>
+template <bool D, class... E>
 template <class R, class... H>
 BOOST_LEAF_CONSTEXPR BOOST_LEAF_ALWAYS_INLINE
 R
-context<E...>::
+context<D, E...>::
 handle_error( error_id id, H && ... h ) const
 {
     BOOST_LEAF_ASSERT(!is_active());
     return leaf_detail::handle_error_<R>(tup(), error_info(id), std::forward<H>(h)...);
 }
 
-template <class... E>
+template <bool D, class... E>
 template <class R, class... H>
 BOOST_LEAF_CONSTEXPR BOOST_LEAF_ALWAYS_INLINE
 R
-context<E...>::
+context<D, E...>::
 handle_error( error_id id, H && ... h )
 {
     BOOST_LEAF_ASSERT(!is_active());

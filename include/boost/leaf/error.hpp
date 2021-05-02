@@ -271,16 +271,28 @@ namespace leaf_detail
         slot<E> * * top_;
         slot<E> * prev_;
 
+#if !defined(NDEBUG)
+        const bool enable_deep_frame_deactivation_;
+#endif
+
     public:
 
-        BOOST_LEAF_CONSTEXPR slot() noexcept:
+        BOOST_LEAF_CONSTEXPR explicit slot(bool enable_deep_frame_deactivation) noexcept:
             top_(0)
+#if !defined(NDEBUG)
+            ,
+            enable_deep_frame_deactivation_(enable_deep_frame_deactivation)
+#endif
         {
         }
 
         BOOST_LEAF_CONSTEXPR slot( slot && x ) noexcept:
             optional<E>(std::move(x)),
             top_(0)
+#if !defined(NDEBUG)
+            ,
+            enable_deep_frame_deactivation_(x.enable_deep_frame_deactivation_)
+#endif
         {
             BOOST_LEAF_ASSERT(x.top_==0);
         }
@@ -295,7 +307,7 @@ namespace leaf_detail
 
         BOOST_LEAF_CONSTEXPR void deactivate() noexcept
         {
-            BOOST_LEAF_ASSERT(top_!=0 && *top_==this);
+            BOOST_LEAF_ASSERT(enable_deep_frame_deactivation_ || top_!=0 && *top_==this);
             *top_ = prev_;
         }
 

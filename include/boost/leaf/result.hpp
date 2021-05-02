@@ -477,6 +477,19 @@ struct is_result_type<result<T>>: std::true_type
 {
 };
 
+////////////////////////////////////////
+
+template<typename T>
+inline result<std::decay_t<T>> success(T &&value) noexcept
+{
+    return {std::forward<T>(value)};
+}
+
+inline result<void> success() noexcept
+{
+    return {};
+}
+
 } }
 
 #if defined(_MSC_VER) && !defined(BOOST_LEAF_ENABLE_WARNINGS) ///
