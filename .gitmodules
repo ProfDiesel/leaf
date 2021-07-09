@@ -1,0 +1,4 @@
+[submodule "contrib/-b"]
+	path = contrib/asio
+	url = https://github.com/chriskohlhoff/asio.git
+	branch = asio-1-20-0
