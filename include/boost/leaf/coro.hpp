@@ -8,8 +8,6 @@
 #include <boost/leaf/context.hpp>
 #include <boost/leaf/handle_errors.hpp>
 
-#include <boost/type_index.hpp>
-
 #include <functional>
 #include <unordered_map>
 
@@ -163,25 +161,7 @@ public:
   }
 
 // LEAF
-  auto await_transform(boost::leaf::context_ptr &&ctx) noexcept {
-    assert(attached_thread_);
-
-    struct result {
-      boost::leaf::context_ptr ctx_;
-      awaitable_frame_base<executor_type> *frame_;
-
-      bool await_ready() const noexcept { return true; }
-
-      void await_suspend(asio::detail::coroutine_handle<void>) noexcept {}
-
-      auto await_resume() const noexcept {
-        assert(!frame_->ctx_);
-        return frame_->ctx_ = ctx_;
-      }
-    };
-
-    return result{std::move(ctx), this};
-  }
+  auto await_transform(boost::leaf::context_ptr &ctx) noexcept;
 // LEAF
 
   void attach_thread(awaitable_thread<executor_type> *handler) noexcept {
@@ -197,7 +177,7 @@ public:
 
   void resume() {
 // LEAF
-    auto _ = ctx_ ? std::optional(boost::leaf::context_activator(*ctx_)) : std::nullopt;
+//    auto _ = ctx_ ? std::optional(boost::leaf::context_activator(*ctx_)) : std::nullopt;
 // LEAF
 
     coro_.resume();
@@ -205,7 +185,7 @@ public:
 
   void destroy() { coro_.destroy(); }
 
-protected:
+//protected:
   coroutine_handle<void> coro_ = nullptr;
   awaitable_thread<executor_type> *attached_thread_ = nullptr;
   awaitable_frame_base<executor_type> *caller_ = nullptr;
@@ -231,7 +211,10 @@ public:
         top_of_stack_(std::exchange(other.top_of_stack_, nullptr)),
         executor_(std::move(other.executor_))
 // LEAF
-        ,ctx_(std::move(other.ctx_)) {}
+        ,
+        ctx_(std::move(other.ctx_)),
+        contexts_(other.contexts_)
+        {}
 // LEAF
 
   // Clean up with a last ditch effort to ensure the thread is unwound within
@@ -253,6 +236,17 @@ public:
     pump();
   }
 
+  void push_context(boost::leaf::context_ptr context)
+  {
+    contexts_.push_back(context);
+  }
+
+  void pop_context(boost::leaf::context_ptr context)
+  {
+    assert(contexts_.back() == context);
+    contexts_.pop_back();
+  }
+
 protected:
   template <typename> friend class awaitable_frame_base;
 
@@ -260,12 +254,17 @@ protected:
   // has been transferred to another resumable_thread object.
   void pump() {
 // LEAF
-    auto activator = boost::leaf::context_activator(*ctx_);
+    std::for_each(contexts_.begin(), contexts_.end(), [](auto &&context) { context->activate(); });
 // LEAF
 
     do
       top_of_stack_->resume();
     while (top_of_stack_);
+
+// LEAF
+    std::for_each(contexts_.rbegin(), contexts_.rend(), [](auto &&context) { context->deactivate(); });
+// LEAF
+
     if (bottom_of_stack_.valid()) {
       awaitable<void, executor_type> a(std::move(bottom_of_stack_));
       a.frame_->rethrow_exception();
@@ -282,6 +281,7 @@ protected:
         std::terminate();
       }); // context without any handler, so that the whole stack of contexts in
           // the thread can be poped at once
+  std::vector<boost::leaf::context_ptr> contexts_;
 // LEAF
 };
 
@@ -290,6 +290,11 @@ void awaitable_frame_base<boost::leaf::executor>::push_frame(awaitable_frame_bas
   attached_thread_ = caller_->attached_thread_;
   attached_thread_->top_of_stack_ = this;
   caller_->attached_thread_ = nullptr;
+
+// LEAF
+  if(ctx_)
+    ctx_->activate();
+// LEAF
 }
 
 void awaitable_frame_base<boost::leaf::executor>::pop_frame() noexcept {
@@ -298,12 +303,43 @@ void awaitable_frame_base<boost::leaf::executor>::pop_frame() noexcept {
   attached_thread_->top_of_stack_ = caller_;
   attached_thread_ = nullptr;
   caller_ = nullptr;
+
+// LEAF
+  if(ctx_)
+    ctx_->deactivate();
+// LEAF
 }
 
 boost::leaf::executor get_executor(awaitable_thread<boost::leaf::executor> *thread)
 {
   return thread->get_executor();
 }
+
+// LEAF
+auto awaitable_frame_base<boost::leaf::executor>::await_transform(boost::leaf::context_ptr &ctx) noexcept {
+  assert(attached_thread_);
+
+  struct result {
+    boost::leaf::context_ptr ctx_;
+    awaitable_frame_base<executor_type> *frame_;
+
+    bool await_ready() const noexcept { return true; }
+
+    void await_suspend(asio::detail::coroutine_handle<void>) noexcept {}
+
+    auto await_resume() const noexcept {
+      assert(!ctx_ || !frame_->ctx_);
+      if(ctx_)
+        frame_->attached_thread_->push_context(ctx_);
+      else if(frame_->ctx_)
+        frame_->attached_thread_->pop_context(frame_->ctx_);
+      return frame_->ctx_ = ctx_;
+    }
+  };
+
+  return result{ctx, this};
+}
+// LEAF
 
 } // namespace detail
 } // namespace asio
@@ -329,14 +365,28 @@ asio::rebind_awaitable_value_t<decltype(std::declval<TryBlock>()()), std::decay_
 co_try_handle_all(TryBlock &&try_block, H &&...h) noexcept
 {
     static_assert(is_result_type<decltype(std::declval<TryBlock>()().await_resume())>::value, "The return type of the try_block passed to a co_try_handle_all function must be registered with leaf::is_result_type");
-    context_type_from_handlers<H...> ctx;
-    auto active_context = activate_context(ctx);
+    auto ctx_ptr = make_shared_context(std::forward<H>(h)...);
+    auto &ctx = static_cast<leaf_detail::polymorphic_context_impl<context_type_from_handlers<H...>>&>(*ctx_ptr);
+
+    co_await ctx_ptr;
+    ctx.activate();
+
     if (auto r = co_await std::forward<TryBlock>(try_block)())
+    {
+        ctx.deactivate();
+        ctx_ptr.reset();
+        co_await ctx_ptr;
+
         co_return std::move(r).value();
+    }
     else
     {
         error_id id = r.error();
+
         ctx.deactivate();
+        ctx_ptr.reset();
+        co_await ctx_ptr;
+
         using R = std::decay_t<decltype(std::declval<TryBlock>()().await_resume().value())>;
         if constexpr(std::is_void_v<R>)
             ctx.template handle_error<R>(std::move(id), std::forward<H>(h)...);
