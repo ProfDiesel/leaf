@@ -292,8 +292,8 @@ void awaitable_frame_base<boost::leaf::executor>::push_frame(awaitable_frame_bas
   caller_->attached_thread_ = nullptr;
 
 // LEAF
-  if(ctx_)
-    ctx_->activate();
+//  if(ctx_)
+//    ctx_->activate();
 // LEAF
 }
 
@@ -305,8 +305,8 @@ void awaitable_frame_base<boost::leaf::executor>::pop_frame() noexcept {
   caller_ = nullptr;
 
 // LEAF
-  if(ctx_)
-    ctx_->deactivate();
+//  if(ctx_)
+//    ctx_->deactivate();
 // LEAF
 }
 
