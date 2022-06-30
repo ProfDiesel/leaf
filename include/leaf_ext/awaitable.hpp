@@ -543,14 +543,14 @@ protected:
 #endif // defined(LEAF)
 };
 
-void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::clear_cancellation_slot()
+inline void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::clear_cancellation_slot()
 {
   assert(this->attached_thread_);
   this->attached_thread_->entry_point()->cancellation_state_.slot().clear();
 }
 
 template <typename T>
-auto asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::await_transform(awaitable<T, leaf_ext::asio::executor> a) const
+inline auto asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::await_transform(awaitable<T, leaf_ext::asio::executor> a) const
 {
   assert(attached_thread_);
   if (attached_thread_->entry_point()->throw_if_cancelled_)
@@ -559,58 +559,58 @@ auto asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::await_transfo
   return a;
 }
 
-leaf_ext::asio::executor asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::get_executor() const noexcept
+inline leaf_ext::asio::executor asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::get_executor() const noexcept
 {
   assert(attached_thread_);
   return attached_thread_->get_executor();
 }
 
-asio::cancellation_state asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::get_cancellation_state() const noexcept
+inline asio::cancellation_state asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::get_cancellation_state() const noexcept
 {
   assert(attached_thread_);
   return attached_thread_->get_cancellation_state();
 }
 
-void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::reset_cancellation_state() const
+inline void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::reset_cancellation_state() const
 {
   assert(attached_thread_);
   attached_thread_->reset_cancellation_state();
 }
 
 template <typename Filter>
-void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::reset_cancellation_state(ASIO_MOVE_ARG(Filter) filter)
+inline void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::reset_cancellation_state(ASIO_MOVE_ARG(Filter) filter)
 {
   assert(attached_thread_);
   attached_thread_->reset_cancellation_state(std::forward<Filter>(filter));
 }
 
 template <typename InFilter, typename OutFilter>
-void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::reset_cancellation_state(ASIO_MOVE_ARG(InFilter) in_filter,
+inline void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::reset_cancellation_state(ASIO_MOVE_ARG(InFilter) in_filter,
                               ASIO_MOVE_ARG(OutFilter) out_filter)
 {
   assert(attached_thread_);
   attached_thread_->reset_cancellation_state(std::forward<InFilter>(in_filter), std::forward<OutFilter>(out_filter));
 }
 
-bool asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::throw_if_cancelled() const
+inline bool asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::throw_if_cancelled() const
 {
   assert(attached_thread_);
   return attached_thread_->throw_if_cancelled();
 }
 
-void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::throw_if_cancelled(bool value)
+inline void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::throw_if_cancelled(bool value)
 {
   assert(attached_thread_);
   attached_thread_->throw_if_cancelled(value);
 }
 
-asio::detail::awaitable_frame<asio::detail::awaitable_thread_entry_point, leaf_ext::asio::executor> *asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::entry_point() const noexcept
+inline asio::detail::awaitable_frame<asio::detail::awaitable_thread_entry_point, leaf_ext::asio::executor> *asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::entry_point() const noexcept
 {
   assert(attached_thread_);
   return attached_thread_->entry_point();
 }
 
-auto asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::await_transform(boost::leaf::context_ptr &ctx) noexcept
+inline auto asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::await_transform(boost::leaf::context_ptr &ctx) noexcept
 {
   assert(attached_thread_);
 
@@ -637,20 +637,20 @@ auto asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::await_transfo
   return result{ctx, this};
 }
 
-void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::attach_thread(awaitable_thread<leaf_ext::asio::executor> *handler) noexcept
+inline void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::attach_thread(awaitable_thread<leaf_ext::asio::executor> *handler) noexcept
 {
   assert(handler);
   attached_thread_ = handler;
 }
 
-asio::detail::awaitable_thread<leaf_ext::asio::executor> *asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::detach_thread() noexcept
+inline asio::detail::awaitable_thread<leaf_ext::asio::executor> *asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::detach_thread() noexcept
 {
   assert(attached_thread_);
   attached_thread_->entry_point()->has_context_switched_ = true;
   return std::exchange(attached_thread_, nullptr);
 }
 
-void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::push_frame(awaitable_frame_base<leaf_ext::asio::executor> *caller) noexcept
+inline void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::push_frame(awaitable_frame_base<leaf_ext::asio::executor> *caller) noexcept
 {
   assert(caller && caller->attached_thread_);
   caller_ = caller;
@@ -659,7 +659,7 @@ void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::push_frame(aw
   caller_->attached_thread_ = nullptr;
 }
 
-void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::pop_frame() noexcept
+inline void asio::detail::awaitable_frame_base<leaf_ext::asio::executor>::pop_frame() noexcept
 {
   assert(attached_thread_);
   if (caller_)

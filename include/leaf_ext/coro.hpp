@@ -6,6 +6,7 @@
 
 #include <boost/leaf/context.hpp>
 #include <boost/leaf/handle_errors.hpp>
+#include <boost/leaf/result.hpp>
 
 #include <functional>
 #include <unordered_map>
@@ -14,10 +15,15 @@ namespace leaf_ext::asio {
 using parent_executor = ::asio::any_io_executor;
 struct executor : parent_executor {
   using parent_executor::parent_executor;
+
+  explicit executor(const parent_executor &other) noexcept: parent_executor(other) {}
 };
 
 template <typename value_type>
 using awaitable = ::asio::awaitable<value_type, executor>;
+
+template <typename value_type>
+using awaitable_result = ::asio::awaitable<boost::leaf::result<value_type>, executor>;
 
 constexpr ::asio::use_awaitable_t<executor> use_awaitable(0, 0, 0);
 
